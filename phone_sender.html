@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GPS Phone Sender</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; background: #000; color: #0f0; text-align: center; padding: 20px; }
+        h2 { border-bottom: 2px solid #0f0; padding-bottom: 10px; }
+        .data-box { font-size: 24px; margin: 20px 0; border: 1px solid #333; padding: 10px; border-radius: 10px; }
+        .status { color: yellow; margin-top: 10px; }
+        .error { color: red; }
+        button { padding: 15px 30px; font-size: 18px; background: #0f0; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+    <h2>📡 Phone GPS Transmitter</h2>
+    <p>Using your phone as the GPS Module</p>
+
+    <div class="data-box">
+        LAT: <span id="lat">Waiting...</span><br>
+        LNG: <span id="lng">Waiting...</span>
+    </div>
+
+    <div id="status" class="status">Ready to start...</div>
+
+    <br><br>
+    <button onclick="startTracking()">🟢 START SENDING</button>
+
+    <script>
+        // --- CONFIGURATION ---
+        const supabaseUrl = 'https://vqihkwvjtybuzgssobof.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxaWhrd3ZqdHlidXpnc3NvYm9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MzExMDUsImV4cCI6MjA4MDQwNzEwNX0.BguXVPkLglb1uME-0pv5HhOf0WFQ0sFJT29qdh-QY5Y';
+        const db = supabase.createClient(supabaseUrl, supabaseKey);
+
+        function startTracking() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerText = "Requesting GPS Permission...";
+
+            if (!navigator.geolocation) {
+                statusDiv.innerHTML = "<span class='error'>GPS not supported by this browser.</span>";
+                return;
+            }
+
+            // Get Real GPS Data
+            navigator.geolocation.watchPosition(
+                successCallback, 
+                errorCallback, 
+                {
+                    enableHighAccuracy: true, // Use GPS (not just Wifi)
+                    timeout: 5000,
+                    maximumAge: 0
+                }
+            );
+        }
+
+        async function successCallback(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy; // in meters
+
+            // Update Screen
+            document.getElementById('lat').innerText = lat.toFixed(6);
+            document.getElementById('lng').innerText = lng.toFixed(6);
+            document.getElementById('status').innerText = `✅ GPS Locked (Accuracy: ${Math.round(accuracy)}m)`;
+
+            // Send to Supabase
+            const { error } = await db.from('gps').insert({
+                lat: lat,
+                lng: lng
+            });
+
+            if (error) {
+                console.error("Upload Error:", error);
+                document.getElementById('status').innerHTML += " <span class='error'>(Upload Failed)</span>";
+            } else {
+                console.log("Sent:", lat, lng);
+            }
+        }
+
+        function errorCallback(error) {
+            let msg = "";
+            switch(error.code) {
+                case error.PERMISSION_DENIED: msg = "User denied GPS."; break;
+                case error.POSITION_UNAVAILABLE: msg = "GPS Signal unavailable."; break;
+                case error.TIMEOUT: msg = "GPS Timeout."; break;
+                case error.UNKNOWN_ERROR: msg = "Unknown Error."; break;
+            }
+            document.getElementById('status').innerHTML = `<span class='error'>Error: ${msg}</span>`;
+        }
+    </script>
+
+</body>
+</html>
