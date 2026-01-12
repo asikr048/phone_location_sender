@@ -11,6 +11,7 @@
         .status { color: yellow; margin-top: 10px; }
         .error { color: red; }
         button { padding: 15px 30px; font-size: 18px; background: #0f0; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; }
+        button:disabled { background: #555; color: #888; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -20,23 +21,28 @@
 
     <div class="data-box">
         LAT: <span id="lat">Waiting...</span><br>
-        LNG: <span id="lng">Waiting...</span>
+        LNG: <span id="lng">Waiting...</span><br>
+        SPD: <span id="spd">0</span> m/s
     </div>
 
     <div id="status" class="status">Ready to start...</div>
 
     <br><br>
-    <button onclick="startTracking()">🟢 START SENDING</button>
+    <button id="startBtn" onclick="startTracking()">🟢 START SENDING</button>
 
     <script>
-        // --- CONFIGURATION ---
-        const supabaseUrl = 'https://jobjdkexdsinichnjhwy.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvYmpka2V4ZHNpbmljaG5qaHd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3MDg3MjYsImV4cCI6MjA3ODI4NDcyNn0.ScepgA3T4LkgGycY1V2U1yE1Ct9Y_TWOdc1H63PqYE0';
+        // --- CONFIGURATION (UPDATED) ---
+        const supabaseUrl = 'https://sasuovhzcuvzizrpluqj.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhc3Vvdmh6Y3V2eml6cnBsdXFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NDA0NTAsImV4cCI6MjA4MzMxNjQ1MH0.7Fm3K3NbXsmigF4QNgj4PDdagorMSoqUBJ8pzhJrEak';
         const db = supabase.createClient(supabaseUrl, supabaseKey);
 
         function startTracking() {
             const statusDiv = document.getElementById('status');
+            const btn = document.getElementById('startBtn');
+            
             statusDiv.innerText = "Requesting GPS Permission...";
+            btn.disabled = true; // Prevent double clicking
+            btn.innerText = "📡 TRACKING ACTIVE";
 
             if (!navigator.geolocation) {
                 statusDiv.innerHTML = "<span class='error'>GPS not supported by this browser.</span>";
@@ -48,8 +54,8 @@
                 successCallback, 
                 errorCallback, 
                 {
-                    enableHighAccuracy: true, // Use GPS (not just Wifi)
-                    timeout: 5000,
+                    enableHighAccuracy: true, // Forces GPS chip usage
+                    timeout: 10000,
                     maximumAge: 0
                 }
             );
@@ -58,17 +64,20 @@
         async function successCallback(position) {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
-            const accuracy = position.coords.accuracy; // in meters
+            const spd = position.coords.speed || 0; // Get speed (or 0 if null)
+            const accuracy = position.coords.accuracy;
 
             // Update Screen
             document.getElementById('lat').innerText = lat.toFixed(6);
             document.getElementById('lng').innerText = lng.toFixed(6);
+            document.getElementById('spd').innerText = spd.toFixed(1);
             document.getElementById('status').innerText = `✅ GPS Locked (Accuracy: ${Math.round(accuracy)}m)`;
 
-            // Send to Supabase
-            const { error } = await db.from('gps').insert({
-                lat: lat,
-                lng: lng
+            // --- SEND TO SUPABASE (UPDATED TABLE & COLUMNS) ---
+            const { error } = await db.from('gps_logs').insert({
+                latitude: lat,
+                longitude: lng,
+                speed: spd
             });
 
             if (error) {
@@ -88,6 +97,8 @@
                 case error.UNKNOWN_ERROR: msg = "Unknown Error."; break;
             }
             document.getElementById('status').innerHTML = `<span class='error'>Error: ${msg}</span>`;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('startBtn').innerText = "🔴 RETRY";
         }
     </script>
 
